@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koku — a plain-text task and notes tool</title>
+<style>
+  :root{
+    --bg:#F6F8FA;
+    --bg-elevated:#FFFFFF;
+    --ink:#1C2530;
+    --ink-soft:#5B6672;
+    --ink-faint:#8891A0;
+    --border:#DCE2E8;
+    --blue:#2C5F8A;
+    --blue-soft:#E3EDF5;
+    --orange:#C96A2E;
+    --orange-soft:#F7E7DA;
+    --focus:#2C5F8A;
+    --done:#9AA5AF;
+    --danger:#B4482A;
+    --danger-soft:#F5DED7;
+    --radius:6px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  html.dark{
+    --bg:#12181F;
+    --bg-elevated:#1A222B;
+    --ink:#E6EAEE;
+    --ink-soft:#93A0AC;
+    --ink-faint:#6B7684;
+    --border:#2A333D;
+    --blue:#6FA8D8;
+    --blue-soft:#223140;
+    --orange:#E0975C;
+    --orange-soft:#3A2A1E;
+    --focus:#6FA8D8;
+    --done:#5E6A76;
+    --danger:#E08267;
+    --danger-soft:#3A231E;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font);
+    -webkit-font-smoothing:antialiased;
+  }
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+  a{color:var(--blue);}
+  [hidden]{ display:none !important; }
+
+  /* ---------- Toolbar ---------- */
+  header.toolbar{
+    position:sticky; top:0; z-index:10;
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:10px 16px;
+    background:var(--bg-elevated);
+    border-bottom:1px solid var(--border);
+  }
+  .app-title{
+    font-size:1.05rem; font-weight:700; margin:0; white-space:nowrap;
+    color:var(--ink);
+  }
+  .toolbar-actions{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    margin-left:auto;
+  }
+  .search-wrap{ position:relative; display:flex; align-items:center; }
+  #search-input{
+    width:200px; max-width:36vw;
+    padding:7px 30px 7px 10px;
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    background:var(--bg);
+    color:var(--ink);
+    font-size:0.9rem;
+    font-family:var(--font);
+  }
+  #search-input:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+  #clear-search{
+    position:absolute; right:4px; top:50%; transform:translateY(-50%);
+    background:none; border:none; color:var(--ink-soft); cursor:pointer;
+    font-size:1rem; line-height:1; padding:4px 6px; border-radius:4px;
+  }
+  #clear-search:hover{ color:var(--ink); }
+
+  button.toolbar-btn{
+    padding:7px 12px;
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    background:var(--bg-elevated);
+    color:var(--ink);
+    font-size:0.88rem;
+    font-family:var(--font);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  button.toolbar-btn:hover{ background:var(--bg); }
+  button.toolbar-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+  #today-btn.active, #upcoming-btn.active{ background:var(--blue); border-color:var(--blue); color:#fff; }
+
+  .tag-wrap{ position:relative; }
+  .tag-panel{
+    position:absolute; top:calc(100% + 6px); right:0;
+    background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px;
+    padding:10px; min-width:220px; max-width:300px; max-height:320px; overflow:auto;
+    box-shadow:0 6px 20px rgba(20,25,30,0.15); z-index:20;
+    display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start;
+  }
+  html.dark .tag-panel{ box-shadow:0 6px 20px rgba(0,0,0,0.5); }
+  .tag-pill{
+    border:1px solid var(--border); background:var(--blue-soft); color:var(--blue);
+    border-radius:999px; padding:4px 10px; font-size:0.8rem; cursor:pointer;
+    font-family:var(--font);
+  }
+  .tag-pill:hover{ background:var(--blue); color:#fff; }
+  .tag-pill:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+  .tag-panel-empty{ color:var(--ink-soft); font-size:0.85rem; padding:4px; }
+
+  /* ---------- Page / outline ---------- */
+  main{ padding:0; }
+  .page{ max-width:760px; margin:0 auto; padding:24px 16px 40vh; }
+  .outline{ width:100%; min-height:50vh; cursor:text; }
+
+  .empty-state{
+    padding:32px 16px; text-align:center;
+    color:var(--ink-soft); font-size:0.95rem;
+  }
+
+  .line-row{
+    display:flex;
+    align-items:flex-start;
+    border-radius:4px;
+  }
+  .line-row.fold-hidden, .line-row.filter-hidden, .line-row.completed-hidden{ display:none; }
+  .line-marker{
+    flex:0 0 20px;
+    width:20px;
+    padding-top:6px;
+    text-align:center;
+    color:var(--ink-soft);
+    user-select:none;
+    font-size:0.7rem;
+  }
+  .line-row[data-type="project"].has-children .line-marker{ cursor:pointer; }
+  .line-row[data-type="project"].has-children .line-marker::before{ content:"▾"; }
+  .line-row[data-type="project"].has-children[data-collapsed="true"] .line-marker::before{ content:"▸"; }
+  .line-row[data-type="task"] .line-marker{ cursor:pointer; font-size:0.95rem; }
+  .line-row[data-type="task"] .line-marker::before{ content:"☐"; display:inline-block; }
+  .line-row[data-type="task"].done-task .line-marker::before{ content:"☑"; color:var(--blue); }
+
+  @keyframes checkPop{
+    0%{ transform:scale(0.5); opacity:0.3; }
+    60%{ transform:scale(1.2); opacity:1; }
+    100%{ transform:scale(1); }
+  }
+  .line-row.just-completed .line-marker::before{ animation:checkPop 0.3s ease; }
+
+  .line-content{
+    flex:1 1 auto;
+    min-width:0;
+    outline:none;
+    white-space:pre-wrap;
+    word-break:break-word;
+    padding:5px 8px;
+    border-radius:4px;
+    min-height:1.7em;
+    line-height:1.6;
+    font-size:0.98rem;
+    transition:color 0.25s ease;
+  }
+  .line-content:focus-visible, .line-content:focus{
+    background:var(--bg-elevated);
+    box-shadow:0 0 0 1.5px var(--focus) inset;
+  }
+  .line-row[data-type="project"] > .line-content{
+    font-weight:700;
+    border-bottom:1px solid var(--border);
+    margin-bottom:1px;
+  }
+  .line-row[data-type="note"] > .line-content{
+    color:var(--ink-soft);
+  }
+  .line-row.done-task > .line-content{
+    color:var(--done);
+    text-decoration:line-through;
+  }
+  .run-search-btn{
+    align-self:center;
+    margin-left:6px;
+    font-size:0.72rem;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:var(--bg-elevated);
+    color:var(--blue);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .run-search-btn:hover{ background:var(--blue-soft); }
+
+  .project-progress{
+    align-self:center;
+    margin-left:8px;
+    font-size:0.78rem;
+    font-weight:400;
+    color:var(--ink-faint);
+    white-space:nowrap;
+  }
+
+  /* Inline tag + markdown styling */
+  .tag{
+    color:var(--blue);
+    background:var(--blue-soft);
+    border-radius:4px;
+    padding:0 4px;
+  }
+  .tag-today{ background:var(--blue); color:#fff; }
+  .tag-do.tag-today-marker{ background:var(--blue); color:#fff; }
+  .tag-due.tag-today{ background:var(--orange); color:#fff; }
+  .tag-due.tag-overdue{ background:var(--danger-soft); color:var(--danger); font-weight:600; }
+  .tag-due.tag-upcoming{ background:var(--orange-soft); color:var(--orange); }
+  .tag-done{ background:transparent; color:var(--done); text-decoration:line-through; padding:0; }
+  .tag-search{ background:var(--orange-soft); color:var(--orange); }
+
+  .md-mark{ color:var(--ink-soft); opacity:0.5; }
+  .md-strong{ font-weight:700; }
+  .md-em{ font-style:italic; }
+  .md-code{ font-family:var(--mono); background:var(--bg); padding:0 4px; border-radius:3px; font-size:0.92em; }
+  .md-heading{ font-weight:700; }
+  .md-link-text{ color:var(--blue); text-decoration:underline; }
+  .md-link-url{ color:var(--ink-soft); font-size:0.85em; }
+
+  .save-status{
+    position:fixed; bottom:10px; right:16px;
+    font-size:0.78rem; color:var(--ink-soft);
+    background:var(--bg-elevated);
+    border:1px solid var(--border);
+    padding:4px 10px;
+    border-radius:999px;
+    opacity:0.9;
+  }
+
+  dialog#help-dialog{
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:0;
+    width:min(520px,90vw);
+    color:var(--ink);
+    background:var(--bg-elevated);
+  }
+  dialog#help-dialog::backdrop{ background:rgba(20,25,30,0.4); }
+  .help-inner{ padding:20px 24px; }
+  .help-inner h2{ margin-top:0; font-size:1.1rem; }
+  .help-inner table{ width:100%; border-collapse:collapse; font-size:0.88rem; }
+  .help-inner td{ padding:6px 4px; border-bottom:1px solid var(--border); vertical-align:top; }
+  .help-inner td.key{ font-family:var(--mono); white-space:nowrap; color:var(--blue); }
+  .help-close{ margin-top:16px; }
+
+  noscript div{
+    max-width:600px; margin:60px auto; padding:20px 24px;
+    background:var(--orange-soft); color:var(--ink); border-radius:8px;
+    font-family:var(--font);
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+
+  @media (max-width: 640px){
+    .app-title{ display:none; }
+    #search-input{ width:130px; }
+  }
+</style>
+</head>
+<body>
+
+<noscript>
+  <div>
+    <strong>This tool needs JavaScript.</strong> Koku is a live text editor, so it can't
+    work without it. Please enable JavaScript in your browser to use it.
+  </div>
+</noscript>
+
+<header class="toolbar">
+  <h1 class="app-title">Koku</h1>
+  <div class="toolbar-actions">
+    <div class="search-wrap">
+      <label for="search-input" class="sr-only">Search the outline</label>
+      <input id="search-input" type="text" placeholder="Search" autocomplete="off">
+      <button id="clear-search" type="button" aria-label="Clear search" hidden>×</button>
+    </div>
+    <button id="today-btn" class="toolbar-btn" type="button" aria-pressed="false">Today</button>
+    <button id="upcoming-btn" class="toolbar-btn" type="button" aria-pressed="false">Upcoming</button>
+    <div class="tag-wrap">
+      <button id="tags-btn" class="toolbar-btn" type="button" aria-haspopup="true" aria-expanded="false">Tags</button>
+      <div id="tag-panel" class="tag-panel" hidden></div>
+    </div>
+    <button id="completed-btn" class="toolbar-btn" type="button" aria-pressed="false">Show completed</button>
+    <button id="export-btn" class="toolbar-btn" type="button">Export .txt</button>
+    <button id="help-btn" class="toolbar-btn" type="button" aria-haspopup="dialog">Shortcuts</button>
+    <button id="theme-btn" class="toolbar-btn" type="button" aria-pressed="false">Dark mode</button>
+  </div>
+</header>
+
+<main>
+  <div class="page">
+    <div id="outline" class="outline" aria-label="Outline document" role="group"></div>
+    <div id="empty-state" class="empty-state" hidden></div>
+  </div>
+</main>
+
+<div id="save-status" class="save-status" role="status" aria-live="polite"></div>
+
+<dialog id="help-dialog">
+  <div class="help-inner">
+    <h2>Keyboard shortcuts</h2>
+    <table>
+      <tbody>
+        <tr><td class="key">Enter</td><td>New line at the same level</td></tr>
+        <tr><td class="key">Shift + Enter</td><td>New line, without copying tags from this one</td></tr>
+        <tr><td class="key">Tab</td><td>Indent this line (and anything nested under it)</td></tr>
+        <tr><td class="key">Shift + Tab</td><td>Outdent this line</td></tr>
+        <tr><td class="key">Ctrl/Cmd + Enter</td><td>Mark a task done or not done</td></tr>
+        <tr><td class="key">Ctrl/Cmd + Shift + ↑ / ↓</td><td>Move this line up or down</td></tr>
+        <tr><td class="key">Ctrl/Cmd + .</td><td>Collapse or expand a project</td></tr>
+        <tr><td class="key">Ctrl/Cmd + Shift + F</td><td>Jump to search</td></tr>
+        <tr><td class="key">Ctrl/Cmd + Shift + T</td><td>Show or hide Today</td></tr>
+      </tbody>
+    </table>
+    <button class="toolbar-btn help-close" id="help-close" type="button">Close</button>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     Koku — a small plain-text outliner in the spirit of
+     TaskPaper. Everything lives in one text document made of
+     three kinds of lines:
+       Project  — a line ending in ":"
+       Task     — a line starting with "- "
+       Note     — anything else
+     Indentation (not stored as literal spaces, but as a level
+     number on each line) shows how lines nest inside each other.
+     ============================================================ */
+
+  var STORAGE_KEY = "outline-lite-document-v1";
+  var THEME_KEY = "outline-lite-theme-v1";
+  var HIDE_COMPLETED_KEY = "outline-lite-hide-completed-v1";
+  var UPCOMING_WINDOW_DAYS = 14;
+
+  var outline = document.getElementById("outline");
+  var emptyState = document.getElementById("empty-state");
+  var searchInput = document.getElementById("search-input");
+  var clearSearchBtn = document.getElementById("clear-search");
+  var todayBtn = document.getElementById("today-btn");
+  var upcomingBtn = document.getElementById("upcoming-btn");
+  var tagsBtn = document.getElementById("tags-btn");
+  var tagPanel = document.getElementById("tag-panel");
+  var completedBtn = document.getElementById("completed-btn");
+  var exportBtn = document.getElementById("export-btn");
+  var helpBtn = document.getElementById("help-btn");
+  var helpDialog = document.getElementById("help-dialog");
+  var helpClose = document.getElementById("help-close");
+  var themeBtn = document.getElementById("theme-btn");
+  var statusEl = document.getElementById("save-status");
+
+  var currentFilter = null;      // null, or a function(text) -> boolean
+  var currentFilterMode = null;  // null | "today" | "upcoming" | "search"
+  var hideCompleted = true;
+
+  var WEEKDAYS = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
+
+  var DEFAULT_DOC =
+"Inbox:\n" +
+"\t- Buy milk @today\n" +
+"\t- Call the dentist @do(" + todayISOOffset(3) + ")\n" +
+"\t- Finish the quarterly report @due(" + todayISOOffset(8) + ")\n" +
+"\tA plain line like this one is just a note.\n" +
+"\n" +
+"Home projects:\n" +
+"\t- Fix the leaky faucet @waiting\n" +
+"\t- Paint the fence @done\n" +
+"\t\tNeed to buy paint first — ask at the hardware store this weekend.\n" +
+"\n" +
+"Saved searches:\n" +
+"\tToday's tasks: @search(@today)\n" +
+"\tWaiting on someone: @search(@waiting)\n" +
+"\n" +
+"About this outline:\n" +
+"\tStart a line with \"- \" to make a task, end a line with \":\" to make a project, or just type to make a note.\n" +
+"\tAdd @tags like @today or @due(2026-09-20). Click Today or Upcoming above to see what needs attention.\n" +
+"\tTasks you check off tuck out of view. Click \"Show completed\" above any time to bring them back.\n" +
+"\tProjects with tasks inside show how many are done, like (1/3).\n" +
+"\tTry typing @do(tomorrow) or @due(next friday) — everyday phrases like that turn into real dates automatically.\n" +
+"\tOpen Shortcuts any time for the full keyboard reference.";
+
+  /* ---------------- date helpers ---------------- */
+
+  function pad2(n){ return n < 10 ? "0" + n : "" + n; }
+
+  function formatISO(d){
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+
+  function addDays(d, n){
+    var r = new Date(d.getTime());
+    r.setDate(r.getDate() + n);
+    return r;
+  }
+
+  function startOfToday(){
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function todayISO(){ return formatISO(startOfToday()); }
+
+  function todayISOOffset(days){ return formatISO(addDays(startOfToday(), days)); }
+
+  function lastDayOfMonth(){
+    var d = startOfToday();
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  }
+
+  function firstDayOfNextMonth(){
+    var d = startOfToday();
+    return new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  }
+
+  // Returns the next date that falls on the given weekday (0=Sun..6=Sat).
+  // With includeToday true, today itself counts if it's already that weekday.
+  function nextOccurrence(dow, includeToday){
+    var d = startOfToday();
+    var cur = d.getDay();
+    var diff = (dow - cur + 7) % 7;
+    if(diff === 0 && !includeToday) diff = 7;
+    return addDays(d, diff);
+  }
+
+  function dueStatus(dateStr){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return "neutral";
+    var t = todayISO();
+    if(dateStr < t) return "overdue";
+    if(dateStr === t) return "today";
+    return "upcoming";
+  }
+
+  // Turns an everyday phrase ("tomorrow", "next friday", "eom", "+3d", ...)
+  // into a YYYY-MM-DD string. Returns null if the phrase isn't recognized,
+  // so the caller can just leave the original text alone.
+  function parseNaturalDate(raw){
+    var s = raw.trim().toLowerCase();
+    if(!s) return null;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if(s === "today") return todayISO();
+    if(s === "tomorrow") return formatISO(addDays(startOfToday(), 1));
+    if(s === "eom" || s === "end of month") return formatISO(lastDayOfMonth());
+    if(s === "eow" || s === "end of week") return formatISO(nextOccurrence(WEEKDAYS.friday, true));
+    if(s === "next week") return formatISO(addDays(nextOccurrence(WEEKDAYS.monday, true), 7));
+    if(s === "next month") return formatISO(firstDayOfNextMonth());
+
+    var m;
+    if((m = s.match(/^in\s+(\d+)\s+day(?:s)?$/))) return formatISO(addDays(startOfToday(), parseInt(m[1], 10)));
+    if((m = s.match(/^in\s+(\d+)\s+week(?:s)?$/))) return formatISO(addDays(startOfToday(), parseInt(m[1], 10) * 7));
+    if((m = s.match(/^\+(\d+)d$/))) return formatISO(addDays(startOfToday(), parseInt(m[1], 10)));
+    if((m = s.match(/^\+(\d+)w$/))) return formatISO(addDays(startOfToday(), parseInt(m[1], 10) * 7));
+
+    if(WEEKDAYS.hasOwnProperty(s)) return formatISO(nextOccurrence(WEEKDAYS[s], true));
+    if((m = s.match(/^this\s+(\w+)$/)) && WEEKDAYS.hasOwnProperty(m[1])) return formatISO(nextOccurrence(WEEKDAYS[m[1]], true));
+    if((m = s.match(/^next\s+(\w+)$/)) && WEEKDAYS.hasOwnProperty(m[1])) return formatISO(addDays(nextOccurrence(WEEKDAYS[m[1]], true), 7));
+
+    return null;
+  }
+
+  // Scans a line's raw text for @do(...) / @due(...) tags whose value is a
+  // recognized phrase rather than a canonical date, and converts it in place.
+  function autoConvertDates(raw){
+    var changed = false;
+    var newText = raw.replace(/@(due|do)\(([^)]*)\)/gi, function(m, kind, val){
+      if(/^\d{4}-\d{2}-\d{2}$/.test(val.trim())) return m;
+      var parsed = parseNaturalDate(val);
+      if(parsed){ changed = true; return "@" + kind + "(" + parsed + ")"; }
+      return m;
+    });
+    return { text: newText, changed: changed };
+  }
+
+  /* ---------------- text helpers ---------------- */
+
+  function escapeHtml(s){
+    return s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function escapeRegex(s){
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function classify(raw){
+    var trimmedStart = raw.replace(/^\s+/, "");
+    var trimmed = raw.trim();
+    if(trimmedStart.indexOf("- ") === 0) return "task";
+    if(trimmed.length > 1 && trimmed.charAt(trimmed.length - 1) === ":") return "project";
+    return "note";
+  }
+
+  function renderTag(tagText){
+    var m = tagText.match(/^@([a-zA-Z_][\w-]*)(?:\(([^)]*)\))?$/);
+    if(!m) return escapeHtml(tagText);
+    var name = m[1];
+    var val = m[2];
+    var lname = name.toLowerCase();
+    var cls = "tag";
+    if(lname === "today"){
+      cls += " tag-today";
+    } else if(lname === "done"){
+      cls += " tag-done";
+    } else if(lname === "due" && val !== undefined){
+      cls += " tag-due tag-" + dueStatus(val);
+    } else if(lname === "do" && val !== undefined){
+      cls += (val === todayISO()) ? " tag-do tag-today-marker" : " tag-do";
+    } else if(lname === "search"){
+      cls += " tag-search";
+    } else {
+      cls += " tag-generic";
+    }
+    return '<span class="' + cls + '">' + tagText + "</span>";
+  }
+
+  var MASTER_RE = /(@[a-zA-Z_][\w-]*(?:\([^)]*\))?)|(\*\*[^*]+?\*\*)|(\*[^*]+?\*)|(`[^`]+?`)|(\[[^\]]+?\]\([^)]+?\))|(^#{1,6}\s.*$)/g;
+
+  function highlightLine(raw){
+    var esc = escapeHtml(raw);
+    return esc.replace(MASTER_RE, function(m, tag, bold, italic, code, link, heading){
+      if(tag) return renderTag(tag);
+      if(bold) return '<span class="md-mark">**</span><span class="md-strong">' + bold.slice(2, -2) + '</span><span class="md-mark">**</span>';
+      if(italic) return '<span class="md-mark">*</span><span class="md-em">' + italic.slice(1, -1) + '</span><span class="md-mark">*</span>';
+      if(code) return '<span class="md-mark">`</span><span class="md-code">' + code.slice(1, -1) + '</span><span class="md-mark">`</span>';
+      if(link){
+        var lm = link.match(/^\[([^\]]+?)\]\(([^)]+?)\)$/);
+        return '<span class="md-mark">[</span><span class="md-link-text">' + lm[1] + '</span><span class="md-mark">](</span><span class="md-link-url">' + lm[2] + '</span><span class="md-mark">)</span>';
+      }
+      if(heading) return '<span class="md-heading">' + heading + "</span>";
+      return m;
+    });
+  }
+
+  /* ---------------- caret helpers ---------------- */
+
+  function getCaretOffset(el){
+    var sel = window.getSelection();
+    if(!sel.rangeCount) return el.textContent.length;
+    var range = sel.getRangeAt(0);
+    if(!el.contains(range.startContainer)) return el.textContent.length;
+    var preRange = range.cloneRange();
+    preRange.selectNodeContents(el);
+    preRange.setEnd(range.startContainer, range.startOffset);
+    return preRange.toString().length;
+  }
+
+  function setCaretOffset(el, offset){
+    var range = document.createRange();
+    var sel = window.getSelection();
+    var remaining = offset;
+    var node = null;
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    while(walker.nextNode()){
+      var n = walker.currentNode;
+      if(remaining <= n.textContent.length){ node = n; break; }
+      remaining -= n.textContent.length;
+    }
+    if(node){
+      range.setStart(node, Math.max(0, remaining));
+    } else {
+      range.selectNodeContents(el);
+      range.collapse(false);
+    }
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  /* ---------------- row structure ---------------- */
+
+  function applyIndentStyle(row){
+    row.style.paddingLeft = (14 + parseInt(row.dataset.indent, 10) * 22) + "px";
+  }
+
+  function createRow(indent, text){
+    text = text || "";
+    var conv = autoConvertDates(text);
+    text = conv.text;
+
+    var row = document.createElement("div");
+    row.className = "line-row";
+    row.dataset.indent = String(indent);
+    row.dataset.collapsed = "false";
+    applyIndentStyle(row);
+
+    var marker = document.createElement("span");
+    marker.className = "line-marker";
+    marker.setAttribute("aria-hidden", "true");
+
+    var content = document.createElement("div");
+    content.className = "line-content";
+    content.contentEditable = "true";
+    content.spellcheck = false;
+    content.setAttribute("role", "textbox");
+    content.setAttribute("aria-multiline", "false");
+    content.textContent = text;
+
+    var progress = document.createElement("span");
+    progress.className = "project-progress";
+    progress.hidden = true;
+
+    row.appendChild(marker);
+    row.appendChild(content);
+    row.appendChild(progress);
+
+    var type = classify(text);
+    row.dataset.type = type;
+    content.innerHTML = highlightLine(text);
+    content.setAttribute("aria-label", type.charAt(0).toUpperCase() + type.slice(1) + " line");
+    row.classList.toggle("done-task", type === "task" && /@done\b/.test(text));
+
+    attachLineEvents(content);
+    updateSavedSearchButton(row, text);
+    return row;
+  }
+
+  function getSubtreeRows(row){
+    var rows = [row];
+    var indent = parseInt(row.dataset.indent, 10);
+    var next = row.nextElementSibling;
+    while(next && parseInt(next.dataset.indent, 10) > indent){
+      rows.push(next);
+      next = next.nextElementSibling;
+    }
+    return rows;
+  }
+
+  function refreshFoldArrows(){
+    var rows = Array.prototype.slice.call(outline.children);
+    rows.forEach(function(row, i){
+      var indent = parseInt(row.dataset.indent, 10);
+      var next = rows[i + 1];
+      var hasChildren = !!next && parseInt(next.dataset.indent, 10) > indent;
+      row.classList.toggle("has-children", hasChildren && row.dataset.type === "project");
+      if(!hasChildren) row.dataset.collapsed = "false";
+    });
+  }
+
+  function refreshProgressBadges(){
+    Array.prototype.forEach.call(outline.children, function(row){
+      var badge = row.querySelector(".project-progress");
+      if(!badge) return;
+      if(row.dataset.type !== "project"){ badge.hidden = true; return; }
+      var subtree = getSubtreeRows(row).slice(1);
+      var total = 0, done = 0;
+      subtree.forEach(function(r){
+        if(r.dataset.type === "task"){
+          total++;
+          if(r.classList.contains("done-task")) done++;
+        }
+      });
+      if(total === 0){
+        badge.hidden = true;
+      } else {
+        badge.hidden = false;
+        badge.textContent = "(" + done + "/" + total + ")";
+      }
+    });
+  }
+
+  function refreshStructure(){
+    refreshFoldArrows();
+    refreshProgressBadges();
+  }
+
+  function applyFoldVisibility(){
+    var rows = Array.prototype.slice.call(outline.children);
+    var stack = [];
+    rows.forEach(function(row){
+      var indent = parseInt(row.dataset.indent, 10);
+      while(stack.length && indent <= stack[stack.length - 1]) stack.pop();
+      row.classList.toggle("fold-hidden", stack.length > 0);
+      row.classList.remove("filter-hidden");
+      if(row.dataset.type === "project" && row.dataset.collapsed === "true" && row.classList.contains("has-children")){
+        stack.push(indent);
+      }
+    });
+  }
+
+  function applyFilterVisibility(predicate){
+    var rows = Array.prototype.slice.call(outline.children);
+    var keep = rows.map(function(){ return false; });
+    rows.forEach(function(row, i){
+      var text = row.querySelector(".line-content").textContent;
+      if(predicate(text)){
+        keep[i] = true;
+        var indent = parseInt(row.dataset.indent, 10);
+        for(var j = i - 1; j >= 0 && indent > 0; j--){
+          var r = rows[j];
+          var ri = parseInt(r.dataset.indent, 10);
+          if(ri < indent && r.dataset.type === "project"){
+            keep[j] = true;
+            indent = ri;
+          }
+        }
+      }
+    });
+    rows.forEach(function(row, i){
+      row.classList.toggle("filter-hidden", !keep[i]);
+      row.classList.remove("fold-hidden");
+    });
+  }
+
+  // Completed tasks tuck out of view independently of fold/filter state,
+  // unless the row is the one currently focused (so finishing a task while
+  // your cursor is still on it doesn't yank it out from under you), or the
+  // active search is explicitly looking for @done items.
+  function applyCompletedVisibility(){
+    var suppress = currentFilterMode === "search" && /@done\b/i.test(searchInput.value);
+    Array.prototype.forEach.call(outline.children, function(row){
+      var isFocused = row.contains(document.activeElement);
+      var hide = hideCompleted && !suppress && row.classList.contains("done-task") && !isFocused;
+      row.classList.toggle("completed-hidden", hide);
+    });
+  }
+
+  function updateEmptyState(){
+    if(!currentFilter){ emptyState.hidden = true; return; }
+    var anyVisible = Array.prototype.some.call(outline.children, function(row){
+      return !row.classList.contains("fold-hidden") &&
+             !row.classList.contains("filter-hidden") &&
+             !row.classList.contains("completed-hidden");
+    });
+    if(anyVisible){ emptyState.hidden = true; return; }
+    var msg;
+    if(currentFilterMode === "today") msg = "Nothing due today.";
+    else if(currentFilterMode === "upcoming") msg = "Nothing coming up in the next two weeks.";
+    else msg = 'No matches for \u201c' + searchInput.value.trim() + '\u201d.';
+    emptyState.textContent = msg;
+    emptyState.hidden = false;
+  }
+
+  function isTodayMatch(text){
+    var doRe = new RegExp("@do\\(" + escapeRegex(todayISO()) + "\\)");
+    return /@today\b/.test(text) || doRe.test(text);
+  }
+
+  function isUpcomingMatch(text){
+    var cutoff = formatISO(addDays(startOfToday(), UPCOMING_WINDOW_DAYS));
+    var re = /@(?:due|do)\((\d{4}-\d{2}-\d{2})\)/g;
+    var m;
+    while((m = re.exec(text))){
+      if(m[1] <= cutoff) return true;
+    }
+    return false;
+  }
+
+  function updateViewCounts(){
+    var todayCount = 0, upcomingCount = 0;
+    Array.prototype.forEach.call(outline.children, function(row){
+      if(row.dataset.type !== "task") return;
+      var text = row.querySelector(".line-content").textContent;
+      if(hideCompleted && /@done\b/.test(text)) return;
+      if(isTodayMatch(text)) todayCount++;
+      if(isUpcomingMatch(text)) upcomingCount++;
+    });
+    todayBtn.textContent = "Today (" + todayCount + ")";
+    upcomingBtn.textContent = "Upcoming (" + upcomingCount + ")";
+  }
+
+  function refreshVisibility(){
+    if(currentFilter){ applyFilterVisibility(currentFilter); }
+    else { applyFoldVisibility(); }
+    applyCompletedVisibility();
+    updateEmptyState();
+    updateViewCounts();
+  }
+
+  function updateSavedSearchButton(row, raw){
+    var m = raw.match(/@search\(([^)]*)\)/);
+    var btn = row.querySelector(".run-search-btn");
+    if(m){
+      if(!btn){
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "run-search-btn";
+        btn.title = "Run this saved search";
+        btn.textContent = "Run";
+        btn.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+        btn.addEventListener("click", function(){ runSearch(btn.dataset.query); });
+        row.insertBefore(btn, row.querySelector(".project-progress"));
+      }
+      btn.dataset.query = m[1];
+    } else if(btn){
+      btn.remove();
+    }
+  }
+
+  function rerenderContent(content){
+    var row = content.closest(".line-row");
+    var raw = content.textContent;
+    var caret = getCaretOffset(content);
+
+    var conv = autoConvertDates(raw);
+    if(conv.changed){
+      var delta = conv.text.length - raw.length;
+      raw = conv.text;
+      content.textContent = raw;
+      caret = Math.max(0, Math.min(caret + delta, raw.length));
+    }
+
+    var type = classify(raw);
+    var typeChanged = row.dataset.type !== type;
+    row.dataset.type = type;
+    content.innerHTML = highlightLine(raw);
+    setCaretOffset(content, caret);
+    content.setAttribute("aria-label", type.charAt(0).toUpperCase() + type.slice(1) + " line");
+    row.classList.toggle("done-task", type === "task" && /@done\b/.test(raw));
+    updateSavedSearchButton(row, raw);
+    if(typeChanged) refreshFoldArrows();
+    refreshProgressBadges();
+  }
+
+  /* ---------------- editing actions ---------------- */
+
+  function scheduleSave(){
+    clearTimeout(scheduleSave._t);
+    setStatus("Saving…");
+    scheduleSave._t = setTimeout(function(){
+      try{
+        localStorage.setItem(STORAGE_KEY, serializeDocument());
+        setStatus("Saved");
+      } catch(err){
+        setStatus("Couldn't save — your browser's storage may be full or disabled.");
+      }
+    }, 400);
+  }
+
+  function setStatus(msg){ statusEl.textContent = msg; }
+
+  function serializeDocument(){
+    return Array.prototype.map.call(outline.children, function(row){
+      var indent = parseInt(row.dataset.indent, 10) || 0;
+      var text = row.querySelector(".line-content").textContent;
+      return "\t".repeat(indent) + text;
+    }).join("\n");
+  }
+
+  function indentLine(row, delta){
+    var subtree = getSubtreeRows(row);
+    var baseIndent = parseInt(row.dataset.indent, 10);
+    if(delta < 0 && baseIndent + delta < 0) return;
+    subtree.forEach(function(r){
+      var ri = parseInt(r.dataset.indent, 10) + delta;
+      if(ri < 0) ri = 0;
+      r.dataset.indent = String(ri);
+      applyIndentStyle(r);
+    });
+    refreshStructure();
+    refreshVisibility();
+    scheduleSave();
+  }
+
+  function toggleFold(row){
+    row.dataset.collapsed = row.dataset.collapsed === "true" ? "false" : "true";
+    refreshVisibility();
+    scheduleSave();
+  }
+
+  function toggleDone(row){
+    var content = row.querySelector(".line-content");
+    var text = content.textContent;
+    var wasDone = /@done\b/.test(text);
+    if(wasDone){
+      text = text.replace(/\s*@done\b/, "").replace(/\s+$/, "");
+    } else {
+      text = text.replace(/\s+$/, "") + " @done";
+    }
+    content.textContent = text;
+    rerenderContent(content);
+    if(!wasDone){
+      row.classList.add("just-completed");
+      setTimeout(function(){ row.classList.remove("just-completed"); }, 350);
+    }
+    refreshVisibility();
+    scheduleSave();
+  }
+
+  function moveLine(row, dir){
+    var subtree = getSubtreeRows(row);
+    var indent = parseInt(row.dataset.indent, 10);
+    var parent = row.parentElement;
+    if(dir === -1){
+      var prevBoundary = subtree[0].previousElementSibling;
+      if(!prevBoundary || parseInt(prevBoundary.dataset.indent, 10) !== indent) return;
+      subtree.forEach(function(r){ parent.insertBefore(r, prevBoundary); });
+    } else {
+      var afterLast = subtree[subtree.length - 1].nextElementSibling;
+      if(!afterLast || parseInt(afterLast.dataset.indent, 10) !== indent) return;
+      var blockEnd = afterLast.nextElementSibling;
+      while(blockEnd && parseInt(blockEnd.dataset.indent, 10) > indent) blockEnd = blockEnd.nextElementSibling;
+      var nodesToMove = [];
+      var n = afterLast;
+      while(n && n !== blockEnd){ nodesToMove.push(n); n = n.nextElementSibling; }
+      var anchor = subtree[0];
+      nodesToMove.forEach(function(r){ parent.insertBefore(r, anchor); });
+    }
+    refreshStructure();
+    refreshVisibility();
+    scheduleSave();
+    row.querySelector(".line-content").focus();
+  }
+
+  function splitLine(row, content, noInherit){
+    var offset = getCaretOffset(content);
+    var full = content.textContent;
+    var before = full.slice(0, offset);
+    var after = full.slice(offset);
+    content.textContent = before;
+    rerenderContent(content);
+
+    var indent = parseInt(row.dataset.indent, 10);
+    var newText = after;
+    if(after.length === 0 && !noInherit){
+      var tags = (before.match(/@[a-zA-Z_][\w-]*(?:\([^)]*\))?/g) || []).filter(function(t){
+        return !/^@done\b/i.test(t);
+      });
+      if(tags.length) newText = tags.join(" ") + " ";
+    }
+    var newRow = createRow(indent, newText);
+    row.parentElement.insertBefore(newRow, row.nextElementSibling);
+    refreshStructure();
+    refreshVisibility();
+    var nc = newRow.querySelector(".line-content");
+    nc.focus();
+    setCaretOffset(nc, nc.textContent.length);
+    scheduleSave();
+  }
+
+  function mergeWithPrevious(row){
+    var prev = row.previousElementSibling;
+    if(!prev) return;
+    var prevContent = prev.querySelector(".line-content");
+    var curContent = row.querySelector(".line-content");
+    var mergeOffset = prevContent.textContent.length;
+    prevContent.textContent = prevContent.textContent + curContent.textContent;
+    row.remove();
+    rerenderContent(prevContent);
+    refreshStructure();
+    refreshVisibility();
+    prevContent.focus();
+    setCaretOffset(prevContent, mergeOffset);
+    scheduleSave();
+  }
+
+  function navigateRow(row, dir, col){
+    var target = row;
+    do {
+      target = dir === -1 ? target.previousElementSibling : target.nextElementSibling;
+    } while(target && (target.classList.contains("fold-hidden") || target.classList.contains("filter-hidden") || target.classList.contains("completed-hidden")));
+    if(!target) return;
+    var c = target.querySelector(".line-content");
+    c.focus();
+    setCaretOffset(c, Math.min(col, c.textContent.length));
+  }
+
+  /* ---------------- line event wiring ---------------- */
+
+  function attachLineEvents(content){
+    content.addEventListener("compositionstart", function(){ content._composing = true; });
+    content.addEventListener("compositionend", function(){
+      content._composing = false;
+      rerenderContent(content);
+      refreshVisibility();
+      scheduleSave();
+    });
+    content.addEventListener("input", function(){
+      if(content._composing) return;
+      rerenderContent(content);
+      refreshVisibility();
+      scheduleSave();
+    });
+    content.addEventListener("blur", function(){
+      // A just-finished task sitting under the cursor is exempt from
+      // hide-completed while focused; once you leave it, let it tuck away.
+      if(hideCompleted) refreshVisibility();
+    });
+    content.addEventListener("keydown", function(e){ handleLineKeydown(e, content); });
+  }
+
+  function handleLineKeydown(e, content){
+    var row = content.closest(".line-row");
+    var mod = e.metaKey || e.ctrlKey;
+    var key = e.key;
+
+    if(mod && e.shiftKey && key === "ArrowUp"){ e.preventDefault(); moveLine(row, -1); return; }
+    if(mod && e.shiftKey && key === "ArrowDown"){ e.preventDefault(); moveLine(row, 1); return; }
+    if(mod && key === "."){
+      e.preventDefault();
+      if(row.dataset.type === "project" && row.classList.contains("has-children")) toggleFold(row);
+      return;
+    }
+    if(mod && key === "Enter"){
+      e.preventDefault();
+      if(row.dataset.type === "task") toggleDone(row);
+      return;
+    }
+    if(key === "Tab"){ e.preventDefault(); indentLine(row, e.shiftKey ? -1 : 1); return; }
+    if(key === "Enter"){ e.preventDefault(); splitLine(row, content, e.shiftKey); return; }
+    if(key === "Backspace"){
+      var offset = getCaretOffset(content);
+      var sel = window.getSelection();
+      if(offset === 0 && sel.isCollapsed){ e.preventDefault(); mergeWithPrevious(row); return; }
+    }
+    if(key === "ArrowUp" && !mod){ e.preventDefault(); navigateRow(row, -1, getCaretOffset(content)); return; }
+    if(key === "ArrowDown" && !mod){ e.preventDefault(); navigateRow(row, 1, getCaretOffset(content)); return; }
+  }
+
+  /* ---------------- search, today, upcoming ---------------- */
+
+  function buildSearchPredicate(query){
+    var tokens = query.trim().split(/\s+/).filter(Boolean);
+    return function(text){
+      var lowerText = text.toLowerCase();
+      return tokens.every(function(tok){
+        var tagMatch = tok.match(/^@([a-zA-Z_][\w-]*)(?:\(([^)]*)\))?$/);
+        if(tagMatch){
+          var name = tagMatch[1], val = tagMatch[2];
+          var re = new RegExp("@" + escapeRegex(name) + "(\\(([^)]*)\\))?", "i");
+          var m = text.match(re);
+          if(!m) return false;
+          if(val !== undefined) return (m[2] || "").toLowerCase().indexOf(val.toLowerCase()) !== -1;
+          return true;
+        }
+        return lowerText.indexOf(tok.toLowerCase()) !== -1;
+      });
+    };
+  }
+
+  function runSearch(query){
+    setFilterMode(null);
+    searchInput.value = query;
+    searchInput.dispatchEvent(new Event("input"));
+    searchInput.focus();
+  }
+
+  function setFilterMode(mode){
+    todayBtn.classList.toggle("active", mode === "today");
+    todayBtn.setAttribute("aria-pressed", String(mode === "today"));
+    upcomingBtn.classList.toggle("active", mode === "upcoming");
+    upcomingBtn.setAttribute("aria-pressed", String(mode === "upcoming"));
+  }
+
+  function toggleTodayView(){
+    if(currentFilterMode === "today"){
+      currentFilter = null; currentFilterMode = null; setFilterMode(null);
+    } else {
+      searchInput.value = ""; clearSearchBtn.hidden = true;
+      currentFilterMode = "today"; setFilterMode("today");
+      currentFilter = isTodayMatch;
+    }
+    refreshVisibility();
+  }
+
+  function toggleUpcomingView(){
+    if(currentFilterMode === "upcoming"){
+      currentFilter = null; currentFilterMode = null; setFilterMode(null);
+    } else {
+      searchInput.value = ""; clearSearchBtn.hidden = true;
+      currentFilterMode = "upcoming"; setFilterMode("upcoming");
+      currentFilter = isUpcomingMatch;
+    }
+    refreshVisibility();
+  }
+
+  searchInput.addEventListener("input", function(){
+    var q = searchInput.value.trim();
+    clearSearchBtn.hidden = !q;
+    setFilterMode(null);
+    if(!q){
+      currentFilter = null;
+      currentFilterMode = null;
+    } else {
+      currentFilter = buildSearchPredicate(q);
+      currentFilterMode = "search";
+    }
+    refreshVisibility();
+  });
+
+  clearSearchBtn.addEventListener("click", function(){
+    searchInput.value = "";
+    searchInput.dispatchEvent(new Event("input"));
+    searchInput.focus();
+  });
+
+  todayBtn.addEventListener("click", toggleTodayView);
+  upcomingBtn.addEventListener("click", toggleUpcomingView);
+
+  window.addEventListener("keydown", function(e){
+    var mod = e.metaKey || e.ctrlKey;
+    if(mod && e.shiftKey && (e.key === "F" || e.key === "f")){ e.preventDefault(); searchInput.focus(); }
+    else if(mod && e.shiftKey && (e.key === "T" || e.key === "t")){ e.preventDefault(); toggleTodayView(); }
+    else if(e.key === "Escape" && !tagPanel.hidden){ closeTagPanel(); }
+  });
+
+  /* ---------------- tag browser ---------------- */
+
+  function collectTags(){
+    var counts = {}, order = [];
+    Array.prototype.forEach.call(outline.children, function(row){
+      var text = row.querySelector(".line-content").textContent;
+      var re = /@([a-zA-Z_][\w-]*)(?:\([^)]*\))?/g, m;
+      while((m = re.exec(text))){
+        var name = m[1].toLowerCase();
+        if(name === "done" || name === "search") continue;
+        if(!(name in counts)){ counts[name] = 0; order.push(name); }
+        counts[name]++;
+      }
+    });
+    order.sort(function(a, b){ return counts[b] - counts[a] || a.localeCompare(b); });
+    return order.map(function(n){ return { name: n, count: counts[n] }; });
+  }
+
+  function renderTagPanel(){
+    var tags = collectTags();
+    tagPanel.innerHTML = "";
+    if(!tags.length){
+      var empty = document.createElement("div");
+      empty.className = "tag-panel-empty";
+      empty.textContent = "No tags yet — add one with @ anywhere in a line.";
+      tagPanel.appendChild(empty);
+      return;
+    }
+    tags.forEach(function(t){
+      var pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "tag-pill";
+      pill.textContent = "@" + t.name + " \u00b7 " + t.count;
+      pill.addEventListener("click", function(){
+        closeTagPanel();
+        runSearch("@" + t.name);
+      });
+      tagPanel.appendChild(pill);
+    });
+  }
+
+  function openTagPanel(){
+    renderTagPanel();
+    tagPanel.hidden = false;
+    tagsBtn.setAttribute("aria-expanded", "true");
+  }
+
+  function closeTagPanel(){
+    tagPanel.hidden = true;
+    tagsBtn.setAttribute("aria-expanded", "false");
+  }
+
+  tagsBtn.addEventListener("click", function(){
+    if(tagPanel.hidden) openTagPanel(); else closeTagPanel();
+  });
+
+  document.addEventListener("click", function(e){
+    if(tagPanel.hidden) return;
+    if(tagPanel.contains(e.target) || tagsBtn.contains(e.target)) return;
+    closeTagPanel();
+  });
+
+  /* ---------------- hide completed ---------------- */
+
+  function updateCompletedBtnLabel(){
+    completedBtn.textContent = hideCompleted ? "Show completed" : "Hide completed";
+    completedBtn.setAttribute("aria-pressed", String(!hideCompleted));
+  }
+
+  function setHideCompleted(v){
+    hideCompleted = v;
+    try{ localStorage.setItem(HIDE_COMPLETED_KEY, String(v)); } catch(err){ /* ignore */ }
+    updateCompletedBtnLabel();
+    refreshVisibility();
+  }
+
+  function initHideCompleted(){
+    var saved = null;
+    try{ saved = localStorage.getItem(HIDE_COMPLETED_KEY); } catch(err){ /* ignore */ }
+    hideCompleted = saved === null ? true : saved === "true";
+    updateCompletedBtnLabel();
+  }
+
+  completedBtn.addEventListener("click", function(){ setHideCompleted(!hideCompleted); });
+
+  /* ---------------- outline click delegation ---------------- */
+
+  outline.addEventListener("click", function(e){
+    var marker = e.target.closest(".line-marker");
+    if(marker){
+      var row = marker.closest(".line-row");
+      if(row.dataset.type === "project"){
+        if(row.classList.contains("has-children")) toggleFold(row);
+      } else if(row.dataset.type === "task"){
+        toggleDone(row);
+      }
+      return;
+    }
+    if(e.target === outline){
+      var rows = outline.children;
+      if(!rows.length) return;
+      var last = rows[rows.length - 1];
+      var c = last.querySelector(".line-content");
+      c.focus();
+      setCaretOffset(c, c.textContent.length);
+    }
+  });
+
+  /* ---------------- export ---------------- */
+
+  exportBtn.addEventListener("click", function(){
+    var text = serializeDocument();
+    var blob = new Blob([text], { type: "text/plain" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "outline.txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  /* ---------------- help dialog ---------------- */
+
+  helpBtn.addEventListener("click", function(){ helpDialog.showModal(); });
+  helpClose.addEventListener("click", function(){ helpDialog.close(); });
+  helpDialog.addEventListener("click", function(e){
+    if(e.target === helpDialog) helpDialog.close();
+  });
+
+  /* ---------------- theme ---------------- */
+
+  function setTheme(dark){
+    document.documentElement.classList.toggle("dark", dark);
+    themeBtn.setAttribute("aria-pressed", String(dark));
+    themeBtn.textContent = dark ? "Light mode" : "Dark mode";
+    try{ localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch(err){ /* ignore */ }
+  }
+
+  function initTheme(){
+    var saved = null;
+    try{ saved = localStorage.getItem(THEME_KEY); } catch(err){ /* ignore */ }
+    var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setTheme(saved ? saved === "dark" : prefersDark);
+  }
+
+  themeBtn.addEventListener("click", function(){
+    setTheme(!document.documentElement.classList.contains("dark"));
+  });
+
+  /* ---------------- load / init ---------------- */
+
+  function loadDocument(){
+    var raw = null;
+    try{ raw = localStorage.getItem(STORAGE_KEY); } catch(err){ raw = null; }
+    if(raw === null || raw === "") raw = DEFAULT_DOC;
+
+    var lines = raw.split("\n");
+    outline.innerHTML = "";
+    lines.forEach(function(line){
+      var i = 0, indent = 0;
+      if(line.charAt(0) === "\t"){
+        while(line.charAt(i) === "\t"){ indent++; i++; }
+      } else {
+        var spaces = 0;
+        while(line.charAt(i) === " "){ spaces++; i++; }
+        indent = Math.floor(spaces / 2);
+      }
+      var text = line.slice(i);
+      outline.appendChild(createRow(indent, text));
+    });
+    if(!outline.children.length){ outline.appendChild(createRow(0, "")); }
+    refreshStructure();
+    refreshVisibility();
+    setStatus("Saved");
+  }
+
+  initTheme();
+  initHideCompleted();
+  loadDocument();
+
+})();
+</script>
+</body>
+</html>

@@ -106,6 +106,8 @@
   button.toolbar-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
   #today-btn.active, #upcoming-btn.active{ background:var(--blue); border-color:var(--blue); color:#fff; }
 
+  #clear-doc-btn:hover{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
+
   .tag-wrap{ position:relative; }
   .tag-panel{
     position:absolute; top:calc(100% + 6px); right:0;
@@ -248,7 +250,28 @@
     opacity:0.9;
   }
 
-  dialog#help-dialog{
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed; bottom:44px; right:16px; z-index:30;
+    display:flex; align-items:center; gap:4px;
+    padding:6px 8px 6px 14px;
+    background:var(--bg-elevated);
+    border:1px solid var(--border);
+    border-radius:999px;
+    font-size:0.82rem;
+    color:var(--ink);
+    box-shadow:0 6px 20px rgba(20,25,30,0.15);
+  }
+  html.dark .toast{ box-shadow:0 6px 20px rgba(0,0,0,0.5); }
+  .toast button{
+    border:none; background:transparent; color:var(--blue);
+    font:inherit; font-weight:600; cursor:pointer;
+    padding:4px 10px; border-radius:999px;
+  }
+  .toast button:hover{ background:var(--blue-soft); }
+  .toast button:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+
+  dialog#help-dialog, dialog#confirm-dialog{
     border:1px solid var(--border);
     border-radius:10px;
     padding:0;
@@ -256,13 +279,19 @@
     color:var(--ink);
     background:var(--bg-elevated);
   }
-  dialog#help-dialog::backdrop{ background:rgba(20,25,30,0.4); }
+  dialog#confirm-dialog{ width:min(420px,90vw); }
+  dialog#help-dialog::backdrop, dialog#confirm-dialog::backdrop{ background:rgba(20,25,30,0.4); }
   .help-inner{ padding:20px 24px; }
   .help-inner h2{ margin-top:0; font-size:1.1rem; }
   .help-inner table{ width:100%; border-collapse:collapse; font-size:0.88rem; }
   .help-inner td{ padding:6px 4px; border-bottom:1px solid var(--border); vertical-align:top; }
   .help-inner td.key{ font-family:var(--mono); white-space:nowrap; color:var(--blue); }
   .help-close{ margin-top:16px; }
+
+  .confirm-text{ margin:0; font-size:0.92rem; color:var(--ink-soft); line-height:1.5; }
+  .dialog-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .toolbar-btn.danger{ background:var(--danger); border-color:var(--danger); color:#fff; }
+  .toolbar-btn.danger:hover{ background:var(--danger); filter:brightness(1.06); }
 
   noscript div{
     max-width:600px; margin:60px auto; padding:20px 24px;
@@ -303,10 +332,11 @@
       <button id="tags-btn" class="toolbar-btn" type="button" aria-haspopup="true" aria-expanded="false">Tags</button>
       <div id="tag-panel" class="tag-panel" hidden></div>
     </div>
-    <button id="completed-btn" class="toolbar-btn" type="button" aria-pressed="false">Show completed</button>
-    <button id="export-btn" class="toolbar-btn" type="button">Export .txt</button>
+    <button id="completed-btn" class="toolbar-btn" type="button" aria-pressed="false">Completed</button>
+    <button id="export-btn" class="toolbar-btn" type="button">Export</button>
+    <button id="clear-doc-btn" class="toolbar-btn" type="button">Clear</button>
     <button id="help-btn" class="toolbar-btn" type="button" aria-haspopup="dialog">Shortcuts</button>
-    <button id="theme-btn" class="toolbar-btn" type="button" aria-pressed="false">Dark mode</button>
+    <button id="theme-btn" class="toolbar-btn" type="button" aria-pressed="false">🌗</button>
   </div>
 </header>
 
@@ -318,6 +348,22 @@
 </main>
 
 <div id="save-status" class="save-status" role="status" aria-live="polite"></div>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden>
+  <span id="toast-msg"></span>
+  <button id="toast-action" type="button" hidden></button>
+</div>
+
+<dialog id="confirm-dialog">
+  <div class="help-inner">
+    <h2>Clear everything?</h2>
+    <p class="confirm-text">Every line in the outline will be removed. You'll be able to undo right after.</p>
+    <div class="dialog-actions">
+      <button class="toolbar-btn" id="confirm-cancel" type="button">Cancel</button>
+      <button class="toolbar-btn danger" id="confirm-ok" type="button">Clear everything</button>
+    </div>
+  </div>
+</dialog>
 
 <dialog id="help-dialog">
   <div class="help-inner">
@@ -374,6 +420,13 @@
   var helpClose = document.getElementById("help-close");
   var themeBtn = document.getElementById("theme-btn");
   var statusEl = document.getElementById("save-status");
+  var clearBtn = document.getElementById("clear-doc-btn");
+  var confirmDialog = document.getElementById("confirm-dialog");
+  var confirmOk = document.getElementById("confirm-ok");
+  var confirmCancel = document.getElementById("confirm-cancel");
+  var toast = document.getElementById("toast");
+  var toastMsg = document.getElementById("toast-msg");
+  var toastAction = document.getElementById("toast-action");
 
   var currentFilter = null;      // null, or a function(text) -> boolean
   var currentFilterMode = null;  // null | "today" | "upcoming" | "search"
@@ -846,9 +899,12 @@
     clearTimeout(scheduleSave._t);
     setStatus("Saving…");
     scheduleSave._t = setTimeout(function(){
+      var text;
       try{
-        localStorage.setItem(STORAGE_KEY, serializeDocument());
+        text = serializeDocument();
+        localStorage.setItem(STORAGE_KEY, text);
         setStatus("Saved");
+        updateClearBtnLabel(text);
       } catch(err){
         setStatus("Couldn't save — your browser's storage may be full or disabled.");
       }
@@ -998,6 +1054,7 @@
       rerenderContent(content);
       refreshVisibility();
       scheduleSave();
+      dismissUndo();
     });
     content.addEventListener("blur", function(){
       // A just-finished task sitting under the cursor is exempt from
@@ -1230,6 +1287,88 @@
     }
   });
 
+  /* ---------------- clear / undo ---------------- */
+
+  var undoDoc = null;
+  var toastTimer = null;
+
+  function updateClearBtnLabel(text){
+    var pristine = (text === undefined ? serializeDocument() : text) === DEFAULT_DOC;
+    clearBtn.textContent = pristine ? "Clear example" : "Clear";
+    clearBtn.title = pristine
+      ? "Remove the example content and start with a blank sheet"
+      : "Remove every line in the outline";
+  }
+
+  function showToast(msg, actionLabel, action){
+    clearTimeout(toastTimer);
+    toastMsg.textContent = msg;
+    if(actionLabel){
+      toastAction.textContent = actionLabel;
+      toastAction.hidden = false;
+      toastAction.onclick = action;
+    } else {
+      toastAction.hidden = true;
+      toastAction.onclick = null;
+    }
+    toast.hidden = false;
+    toastTimer = setTimeout(hideToast, 8000);
+  }
+
+  function hideToast(){
+    clearTimeout(toastTimer);
+    toast.hidden = true;
+  }
+
+  // The undo offer is only good while the sheet is still empty. As soon as
+  // you type something new, restoring the old document would silently
+  // destroy that, so the offer retires.
+  function dismissUndo(){
+    undoDoc = null;
+    hideToast();
+  }
+
+  function clearDocument(){
+    undoDoc = serializeDocument();
+
+    // A blank sheet shouldn't be hidden behind whatever filter was active.
+    searchInput.value = "";
+    clearSearchBtn.hidden = true;
+    setFilterMode(null);
+    currentFilter = null;
+    currentFilterMode = null;
+
+    renderDocument("");
+    scheduleSave();
+
+    var first = outline.querySelector(".line-content");
+    if(first){ first.focus(); setCaretOffset(first, 0); }
+
+    showToast("Outline cleared.", "Undo", function(){
+      if(undoDoc === null) return;
+      var restored = undoDoc;
+      undoDoc = null;
+      hideToast();
+      renderDocument(restored);
+      scheduleSave();
+    });
+  }
+
+  clearBtn.addEventListener("click", function(){
+    // Nothing worth protecting yet — skip the ceremony.
+    if(serializeDocument() === DEFAULT_DOC) clearDocument();
+    else confirmDialog.showModal();
+  });
+
+  confirmCancel.addEventListener("click", function(){ confirmDialog.close(); });
+  confirmOk.addEventListener("click", function(){
+    confirmDialog.close();
+    clearDocument();
+  });
+  confirmDialog.addEventListener("click", function(e){
+    if(e.target === confirmDialog) confirmDialog.close();
+  });
+
   /* ---------------- export ---------------- */
 
   exportBtn.addEventListener("click", function(){
@@ -1258,7 +1397,7 @@
   function setTheme(dark){
     document.documentElement.classList.toggle("dark", dark);
     themeBtn.setAttribute("aria-pressed", String(dark));
-    themeBtn.textContent = dark ? "Light mode" : "Dark mode";
+    themeBtn.textContent = dark ? "🌗" : "🌗";
     try{ localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch(err){ /* ignore */ }
   }
 
@@ -1275,11 +1414,7 @@
 
   /* ---------------- load / init ---------------- */
 
-  function loadDocument(){
-    var raw = null;
-    try{ raw = localStorage.getItem(STORAGE_KEY); } catch(err){ raw = null; }
-    if(raw === null || raw === "") raw = DEFAULT_DOC;
-
+  function renderDocument(raw){
     var lines = raw.split("\n");
     outline.innerHTML = "";
     lines.forEach(function(line){
@@ -1291,12 +1426,19 @@
         while(line.charAt(i) === " "){ spaces++; i++; }
         indent = Math.floor(spaces / 2);
       }
-      var text = line.slice(i);
-      outline.appendChild(createRow(indent, text));
+      outline.appendChild(createRow(indent, line.slice(i)));
     });
     if(!outline.children.length){ outline.appendChild(createRow(0, "")); }
     refreshStructure();
     refreshVisibility();
+    updateClearBtnLabel();
+  }
+
+  function loadDocument(){
+    var raw = null;
+    try{ raw = localStorage.getItem(STORAGE_KEY); } catch(err){ raw = null; }
+    if(raw === null || raw === "") raw = DEFAULT_DOC;
+    renderDocument(raw);
     setStatus("Saved");
   }
 

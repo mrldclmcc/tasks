@@ -104,7 +104,7 @@
   }
   button.toolbar-btn:hover{ background:var(--bg); }
   button.toolbar-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
-  #today-btn.active, #upcoming-btn.active{ background:var(--blue); border-color:var(--blue); color:#fff; }
+  #today-btn.active, #upcoming-btn.active, #agenda-btn.active{ background:var(--blue); border-color:var(--blue); color:#fff; }
 
   #clear-doc-btn:hover{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
 
@@ -231,6 +231,72 @@
   .tag-due.tag-upcoming{ background:var(--orange-soft); color:var(--orange); }
   .tag-done{ background:transparent; color:var(--done); text-decoration:line-through; padding:0; }
   .tag-search{ background:var(--orange-soft); color:var(--orange); }
+  .tag-do-timed{ font-weight:600; }
+
+  /* ---------- Agenda view ---------- */
+  .agenda-view{ padding-top:8px; }
+  .agenda-heading{
+    font-weight:700; font-size:0.98rem; color:var(--ink);
+    border-bottom:1px solid var(--border);
+    padding:10px 8px 6px; margin-top:20px;
+  }
+  .agenda-heading:first-child{ margin-top:0; }
+  .agenda-heading.agenda-conflict{
+    color:var(--danger); background:var(--danger-soft);
+    border-bottom-color:var(--danger); border-radius:4px;
+  }
+  .agenda-group{ padding-left:2px; margin-bottom:4px; }
+  .agenda-item{
+    display:flex; align-items:flex-start; gap:8px;
+    padding:5px 8px; border-radius:4px;
+  }
+  .agenda-item:hover{ background:var(--bg); }
+  .agenda-checkbox{
+    cursor:pointer; font-size:0.95rem; padding-top:3px; user-select:none;
+    width:1.2em; flex:0 0 auto; text-align:center;
+  }
+  .agenda-item-text{
+    flex:1 1 auto; cursor:pointer; outline:none; line-height:1.6;
+    border-radius:4px; white-space:pre-wrap; word-break:break-word;
+  }
+  .agenda-item-text:hover{ text-decoration:underline; }
+  .agenda-item-text:focus-visible{ box-shadow:0 0 0 1.5px var(--focus) inset; }
+  .agenda-item-project{ font-weight:700; cursor:pointer; }
+  .agenda-item.agenda-done .agenda-item-text{ color:var(--done); text-decoration:line-through; }
+  .agenda-breadcrumb{
+    color:var(--ink-faint); font-size:0.78rem; white-space:nowrap; padding-top:4px;
+  }
+
+  /* ---------- @ tag menu ---------- */
+  #at-menu{
+    position:fixed; z-index:30;
+    background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px;
+    padding:6px; min-width:220px; max-width:280px; max-height:340px; overflow:auto;
+    box-shadow:0 6px 20px rgba(20,25,30,0.15);
+  }
+  html.dark #at-menu{ box-shadow:0 6px 20px rgba(0,0,0,0.5); }
+  .at-menu-group-label{
+    font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em;
+    color:var(--ink-faint); padding:7px 8px 2px;
+  }
+  .at-menu-row{
+    display:block; width:100%; text-align:left; cursor:pointer;
+    background:none; border:none; padding:6px 8px; border-radius:5px;
+    font-family:var(--font);
+  }
+  .at-menu-row:hover{ background:var(--blue-soft); }
+  .at-menu-row:focus-visible{ outline:2px solid var(--focus); outline-offset:-2px; }
+  .at-menu-row-name{ font-family:var(--mono); color:var(--blue); font-size:0.86rem; }
+  .at-menu-row-desc{ display:block; font-size:0.75rem; color:var(--ink-soft); margin-top:1px; }
+  .at-menu-empty{ padding:8px; color:var(--ink-soft); font-size:0.85rem; }
+  .at-menu-chips{ display:flex; flex-wrap:wrap; gap:6px; padding:4px 4px 8px; }
+  .at-chip{
+    border:1px solid var(--border); background:var(--bg); color:var(--ink);
+    border-radius:999px; padding:5px 10px; font-size:0.8rem; cursor:pointer;
+    font-family:var(--font);
+  }
+  .at-chip:hover{ background:var(--blue-soft); border-color:var(--blue); }
+  .at-chip-skip{ background:none; border:none; color:var(--ink-soft); text-decoration:underline; padding:4px 6px; }
 
   .md-mark{ color:var(--ink-soft); opacity:0.5; }
   .md-strong{ font-weight:700; }
@@ -328,15 +394,16 @@
     </div>
     <button id="today-btn" class="toolbar-btn" type="button" aria-pressed="false">Today</button>
     <button id="upcoming-btn" class="toolbar-btn" type="button" aria-pressed="false">Upcoming</button>
+    <button id="agenda-btn" class="toolbar-btn" type="button" aria-pressed="false">Agenda</button>
     <div class="tag-wrap">
       <button id="tags-btn" class="toolbar-btn" type="button" aria-haspopup="true" aria-expanded="false">Tags</button>
       <div id="tag-panel" class="tag-panel" hidden></div>
     </div>
-    <button id="completed-btn" class="toolbar-btn" type="button" aria-pressed="false">Completed</button>
-    <button id="export-btn" class="toolbar-btn" type="button">Export</button>
+    <button id="completed-btn" class="toolbar-btn" type="button" aria-pressed="false">Show completed</button>
+    <button id="export-btn" class="toolbar-btn" type="button">Export .txt</button>
     <button id="clear-doc-btn" class="toolbar-btn" type="button">Clear</button>
     <button id="help-btn" class="toolbar-btn" type="button" aria-haspopup="dialog">Shortcuts</button>
-    <button id="theme-btn" class="toolbar-btn" type="button" aria-pressed="false">🌗</button>
+    <button id="theme-btn" class="toolbar-btn" type="button" aria-pressed="false">Dark mode</button>
   </div>
 </header>
 
@@ -344,10 +411,12 @@
   <div class="page">
     <div id="outline" class="outline" aria-label="Outline document" role="group"></div>
     <div id="empty-state" class="empty-state" hidden></div>
+    <div id="agenda-view" class="agenda-view" aria-label="Today's time blocks" role="group" hidden></div>
   </div>
 </main>
 
 <div id="save-status" class="save-status" role="status" aria-live="polite"></div>
+<div id="at-menu" class="at-menu" role="listbox" hidden></div>
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden>
   <span id="toast-msg"></span>
@@ -379,6 +448,8 @@
         <tr><td class="key">Ctrl/Cmd + .</td><td>Collapse or expand a project</td></tr>
         <tr><td class="key">Ctrl/Cmd + Shift + F</td><td>Jump to search</td></tr>
         <tr><td class="key">Ctrl/Cmd + Shift + T</td><td>Show or hide Today</td></tr>
+        <tr><td class="key">Ctrl/Cmd + Shift + A</td><td>Show or hide Agenda (today's time blocks)</td></tr>
+        <tr><td class="key">@</td><td>Open the tag menu — pick a tag, or keep typing to filter it</td></tr>
       </tbody>
     </table>
     <button class="toolbar-btn help-close" id="help-close" type="button">Close</button>
@@ -411,16 +482,19 @@
   var clearSearchBtn = document.getElementById("clear-search");
   var todayBtn = document.getElementById("today-btn");
   var upcomingBtn = document.getElementById("upcoming-btn");
+  var agendaBtn = document.getElementById("agenda-btn");
+  var agendaView = document.getElementById("agenda-view");
+  var atMenu = document.getElementById("at-menu");
   var tagsBtn = document.getElementById("tags-btn");
   var tagPanel = document.getElementById("tag-panel");
   var completedBtn = document.getElementById("completed-btn");
   var exportBtn = document.getElementById("export-btn");
+  var clearBtn = document.getElementById("clear-doc-btn");
   var helpBtn = document.getElementById("help-btn");
   var helpDialog = document.getElementById("help-dialog");
   var helpClose = document.getElementById("help-close");
   var themeBtn = document.getElementById("theme-btn");
   var statusEl = document.getElementById("save-status");
-  var clearBtn = document.getElementById("clear-doc-btn");
   var confirmDialog = document.getElementById("confirm-dialog");
   var confirmOk = document.getElementById("confirm-ok");
   var confirmCancel = document.getElementById("confirm-cancel");
@@ -431,6 +505,8 @@
   var currentFilter = null;      // null, or a function(text) -> boolean
   var currentFilterMode = null;  // null | "today" | "upcoming" | "search"
   var hideCompleted = true;
+  var agendaActive = false;
+  var atMenuState = null;        // null, or { content, atPos, caretPos, mode, startLabel }
 
   var WEEKDAYS = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
 
@@ -439,6 +515,7 @@
 "\t- Buy milk @today\n" +
 "\t- Call the dentist @do(" + todayISOOffset(3) + ")\n" +
 "\t- Finish the quarterly report @due(" + todayISOOffset(8) + ")\n" +
+"\t- Draft the proposal @do(today 9-10am)\n" +
 "\tA plain line like this one is just a note.\n" +
 "\n" +
 "Home projects:\n" +
@@ -456,6 +533,8 @@
 "\tTasks you check off tuck out of view. Click \"Show completed\" above any time to bring them back.\n" +
 "\tProjects with tasks inside show how many are done, like (1/3).\n" +
 "\tTry typing @do(tomorrow) or @due(next friday) — everyday phrases like that turn into real dates automatically.\n" +
+"\tGive @do a time too, like @do(fri 9-10am) or @do(2pm +30m) — click Agenda above to see today's blocks laid out by time.\n" +
+"\tType @ anywhere in a line to open a menu of tags, with a guided picker for @do's date and time.\n" +
 "\tOpen Shortcuts any time for the full keyboard reference.";
 
   /* ---------------- date helpers ---------------- */
@@ -537,14 +616,162 @@
     return null;
   }
 
+  /* ---------------- @do time-range grammar ----------------
+     @do can carry an optional time range after the date phrase:
+       @do(fri)                  -- date only (unchanged from before)
+       @do(9-10am)                -- time only, implies today
+       @do(fri 9-10am)            -- date + start-end
+       @do(fri 9am-10am)
+       @do(fri 9am +30m)          -- date + start + duration
+       @do(fri 9am for 1h30m)
+     Canonical stored form is always "YYYY-MM-DD" or
+     "YYYY-MM-DD HH:MM-HH:MM" (24-hour), regardless of how it was typed.
+     Working hours (8am-6pm) are used to infer am/pm when the user
+     doesn't say — anything genuinely ambiguous (bare "7", or an
+     inference that would produce start >= end) is left untouched
+     rather than guessed at. */
+
+  var CANONICAL_DO_RE = /^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}-\d{2}:\d{2})?$/;
+
+  function pad2Str(n){ return pad2(n); }
+
+  // A bare hour (1-12, no am/pm given) inferred against working hours.
+  // Returns "am" | "pm" | null (null = genuinely ambiguous, e.g. 7).
+  function inferPeriod(h){
+    if(h === 12) return "pm";
+    if(h >= 8 && h <= 11) return "am";
+    if(h >= 1 && h <= 6) return "pm";
+    return null;
+  }
+
+  function to24Hour(h, period){ return (h % 12) + (period === "pm" ? 12 : 0); }
+
+  function parseTimeToken(tok){
+    var m = tok.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+    if(!m) return null;
+    var h = parseInt(m[1], 10);
+    var mi = m[2] ? parseInt(m[2], 10) : 0;
+    if(h < 1 || h > 12 || mi > 59) return null;
+    return { h: h, m: mi, period: m[3] ? m[3].toLowerCase() : null };
+  }
+
+  function minutesToHHMM(min){
+    var h = Math.floor(min / 60), m = min % 60;
+    return pad2Str(h) + ":" + pad2Str(m);
+  }
+
+  // Resolves a start/end pair of raw time tokens into {startMin,endMin}
+  // (minutes since midnight), inferring am/pm as needed. Returns
+  // {error:true} if genuinely ambiguous or if it would invert (start>=end).
+  function resolveTimeRange(startTok, endTok){
+    var s = parseTimeToken(startTok), e = parseTimeToken(endTok);
+    if(!s || !e) return null;
+    if(!s.period && !e.period){
+      s.period = inferPeriod(s.h);
+      e.period = inferPeriod(e.h);
+      if(!s.period || !e.period) return { error: true };
+    } else if(s.period && !e.period){
+      var eWithS = to24Hour(e.h, s.period), sMin = to24Hour(s.h, s.period);
+      if(eWithS > sMin){ e.period = s.period; }
+      else { e.period = inferPeriod(e.h); if(!e.period) return { error: true }; }
+    } else if(!s.period && e.period){
+      var sWithE = to24Hour(s.h, e.period), eMin = to24Hour(e.h, e.period);
+      if(sWithE < eMin){ s.period = e.period; }
+      else { s.period = inferPeriod(s.h); if(!s.period) return { error: true }; }
+    }
+    var startMin = to24Hour(s.h, s.period) * 60 + s.m;
+    var endMin = to24Hour(e.h, e.period) * 60 + e.m;
+    if(startMin >= endMin) return { error: true };
+    return { startMin: startMin, endMin: endMin };
+  }
+
+  function resolveTimeDuration(startTok, durTok){
+    var s = parseTimeToken(startTok);
+    if(!s) return null;
+    if(!s.period){ s.period = inferPeriod(s.h); if(!s.period) return { error: true }; }
+    var dm = durTok.trim().match(/^(?:(\d+(?:\.\d+)?)\s*h(?:ours?|r)?)?\s*(?:(\d+)\s*m(?:in(?:utes?)?)?)?$/i);
+    if(!dm) return null;
+    var hours = dm[1] ? parseFloat(dm[1]) : 0;
+    var mins = dm[2] ? parseInt(dm[2], 10) : 0;
+    var dur = Math.round(hours * 60) + mins;
+    if(dur <= 0) return null;
+    var startMin = to24Hour(s.h, s.period) * 60 + s.m;
+    var endMin = startMin + dur;
+    if(endMin >= 24 * 60) return { error: true };
+    return { startMin: startMin, endMin: endMin };
+  }
+
+  var TIME_TOK_RE = "\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?";
+
+  // Tries to parse `str` as a complete time clause (range, start+duration,
+  // or bare start). Returns {startMin,endMin} | {error:true} | null
+  // (null = doesn't look like a time clause at all).
+  function parseTimeClauseCandidate(str){
+    str = str.trim();
+    var rangeRe = new RegExp("^(" + TIME_TOK_RE + ")\\s*(?:-|to)\\s*(" + TIME_TOK_RE + ")$", "i");
+    var m = str.match(rangeRe);
+    if(m) return resolveTimeRange(m[1], m[2]);
+    var durRe = new RegExp("^(" + TIME_TOK_RE + ")\\s*(?:\\+|for)\\s*((?:\\d+(?:\\.\\d+)?\\s*h(?:ours?|r)?)?\\s*(?:\\d+\\s*m(?:in(?:utes?)?)?)?)$", "i");
+    m = str.match(durRe);
+    if(m && /\d/.test(m[2])) return resolveTimeDuration(m[1], m[2]);
+    var startRe = new RegExp("^" + TIME_TOK_RE + "$", "i");
+    if(startRe.test(str)) return { error: true }; // a bare start alone isn't enough for a block
+    return null;
+  }
+
+  // Parses a full @do(...) value ("fri 9-10am", "9am +30m", "next friday", ...)
+  // into its canonical "YYYY-MM-DD" or "YYYY-MM-DD HH:MM-HH:MM" form.
+  // Returns null if nothing usable was found, leaving the original text alone.
+  function canonicalizeDoValue(raw){
+    var val = raw.trim();
+    if(!val) return null;
+    if(CANONICAL_DO_RE.test(val)) return val;
+
+    var tokens = val.split(/\s+/);
+    var timeResult = null, dateTokenCount = tokens.length;
+    for(var len = Math.min(4, tokens.length); len >= 1; len--){
+      var candidate = tokens.slice(tokens.length - len).join(" ");
+      var r = parseTimeClauseCandidate(candidate);
+      if(r){
+        if(r.error) return null; // ambiguous or invalid — leave the whole value alone
+        timeResult = r;
+        dateTokenCount = tokens.length - len;
+        break;
+      }
+    }
+
+    var datePhrase = tokens.slice(0, dateTokenCount).join(" ").trim();
+    var dateISO;
+    if(!datePhrase){
+      if(!timeResult) return null; // no date, no recognizable time — nothing to do
+      dateISO = todayISO(); // bare time implies today
+    } else {
+      dateISO = parseNaturalDate(datePhrase);
+      if(!dateISO) return null;
+    }
+
+    if(timeResult){
+      return dateISO + " " + minutesToHHMM(timeResult.startMin) + "-" + minutesToHHMM(timeResult.endMin);
+    }
+    return dateISO;
+  }
+
   // Scans a line's raw text for @do(...) / @due(...) tags whose value is a
   // recognized phrase rather than a canonical date, and converts it in place.
   function autoConvertDates(raw){
     var changed = false;
     var newText = raw.replace(/@(due|do)\(([^)]*)\)/gi, function(m, kind, val){
-      if(/^\d{4}-\d{2}-\d{2}$/.test(val.trim())) return m;
-      var parsed = parseNaturalDate(val);
-      if(parsed){ changed = true; return "@" + kind + "(" + parsed + ")"; }
+      var lkind = kind.toLowerCase();
+      var trimmed = val.trim();
+      if(lkind === "do"){
+        if(CANONICAL_DO_RE.test(trimmed)) return m;
+        var canon = canonicalizeDoValue(trimmed);
+        if(canon){ changed = true; return "@do(" + canon + ")"; }
+        return m;
+      }
+      if(/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return m;
+      var parsed = parseNaturalDate(trimmed);
+      if(parsed){ changed = true; return "@due(" + parsed + ")"; }
       return m;
     });
     return { text: newText, changed: changed };
@@ -586,7 +813,9 @@
     } else if(lname === "due" && val !== undefined){
       cls += " tag-due tag-" + dueStatus(val);
     } else if(lname === "do" && val !== undefined){
-      cls += (val === todayISO()) ? " tag-do tag-today-marker" : " tag-do";
+      var doDate = val.split(" ")[0];
+      cls += (doDate === todayISO()) ? " tag-do tag-today-marker" : " tag-do";
+      if(/^\d{2}:\d{2}-\d{2}:\d{2}$/.test(val.split(" ")[1] || "")) cls += " tag-do-timed";
     } else if(lname === "search"){
       cls += " tag-search";
     } else {
@@ -694,6 +923,19 @@
     attachLineEvents(content);
     updateSavedSearchButton(row, text);
     return row;
+  }
+
+  // Walks upward from `row` by indentation and returns its immediate
+  // parent row if that parent is a project, else null.
+  function findParentProjectRow(row){
+    var rows = Array.prototype.slice.call(outline.children);
+    var idx = rows.indexOf(row);
+    var indent = parseInt(row.dataset.indent, 10);
+    for(var j = idx - 1; j >= 0 && indent > 0; j--){
+      var r = rows[j], ri = parseInt(r.dataset.indent, 10);
+      if(ri < indent) return r.dataset.type === "project" ? r : null;
+    }
+    return null;
   }
 
   function getSubtreeRows(row){
@@ -813,13 +1055,13 @@
   }
 
   function isTodayMatch(text){
-    var doRe = new RegExp("@do\\(" + escapeRegex(todayISO()) + "\\)");
+    var doRe = new RegExp("@do\\(" + escapeRegex(todayISO()) + "(?:\\s\\d{2}:\\d{2}-\\d{2}:\\d{2})?\\)");
     return /@today\b/.test(text) || doRe.test(text);
   }
 
   function isUpcomingMatch(text){
     var cutoff = formatISO(addDays(startOfToday(), UPCOMING_WINDOW_DAYS));
-    var re = /@(?:due|do)\((\d{4}-\d{2}-\d{2})\)/g;
+    var re = /@(?:due|do)\((\d{4}-\d{2}-\d{2})(?:\s\d{2}:\d{2}-\d{2}:\d{2})?\)/g;
     var m;
     while((m = re.exec(text))){
       if(m[1] <= cutoff) return true;
@@ -1005,8 +1247,23 @@
     var newRow = createRow(indent, newText);
     row.parentElement.insertBefore(newRow, row.nextElementSibling);
     refreshStructure();
-    refreshVisibility();
+
+    // If this new line is being created as a child of a project that
+    // carries its own @do(...), copy that value onto the child once, at
+    // creation time only — it's just a plain, independent tag after that.
     var nc = newRow.querySelector(".line-content");
+    if(!/@do\(/i.test(nc.textContent)){
+      var parentRow = findParentProjectRow(newRow);
+      if(parentRow){
+        var pm = parentRow.querySelector(".line-content").textContent.match(/@do\([^)]*\)/i);
+        if(pm){
+          nc.textContent = (nc.textContent.trim() ? nc.textContent.trim() + " " : "") + pm[0];
+          rerenderContent(nc);
+        }
+      }
+    }
+
+    refreshVisibility();
     nc.focus();
     setCaretOffset(nc, nc.textContent.length);
     scheduleSave();
@@ -1048,6 +1305,7 @@
       rerenderContent(content);
       refreshVisibility();
       scheduleSave();
+      handleAtMenuInput(content);
     });
     content.addEventListener("input", function(){
       if(content._composing) return;
@@ -1055,11 +1313,13 @@
       refreshVisibility();
       scheduleSave();
       dismissUndo();
+      handleAtMenuInput(content);
     });
     content.addEventListener("blur", function(){
       // A just-finished task sitting under the cursor is exempt from
       // hide-completed while focused; once you leave it, let it tuck away.
       if(hideCompleted) refreshVisibility();
+      if(atMenuState && atMenuState.content === content) closeAtMenu();
     });
     content.addEventListener("keydown", function(e){ handleLineKeydown(e, content); });
   }
@@ -1128,6 +1388,7 @@
   }
 
   function toggleTodayView(){
+    hideAgenda();
     if(currentFilterMode === "today"){
       currentFilter = null; currentFilterMode = null; setFilterMode(null);
     } else {
@@ -1139,6 +1400,7 @@
   }
 
   function toggleUpcomingView(){
+    hideAgenda();
     if(currentFilterMode === "upcoming"){
       currentFilter = null; currentFilterMode = null; setFilterMode(null);
     } else {
@@ -1150,6 +1412,7 @@
   }
 
   searchInput.addEventListener("input", function(){
+    hideAgenda();
     var q = searchInput.value.trim();
     clearSearchBtn.hidden = !q;
     setFilterMode(null);
@@ -1176,7 +1439,9 @@
     var mod = e.metaKey || e.ctrlKey;
     if(mod && e.shiftKey && (e.key === "F" || e.key === "f")){ e.preventDefault(); searchInput.focus(); }
     else if(mod && e.shiftKey && (e.key === "T" || e.key === "t")){ e.preventDefault(); toggleTodayView(); }
+    else if(mod && e.shiftKey && (e.key === "A" || e.key === "a")){ e.preventDefault(); toggleAgendaView(); }
     else if(e.key === "Escape" && !tagPanel.hidden){ closeTagPanel(); }
+    else if(e.key === "Escape" && atMenuState){ closeAtMenu(); }
   });
 
   /* ---------------- tag browser ---------------- */
@@ -1241,6 +1506,186 @@
     closeTagPanel();
   });
 
+  /* ---------------- agenda view ----------------
+     A read-mostly overlay, not a filter: it re-projects today's timed
+     @do entries grouped by exact time range, out of document order.
+     Because that violates the outline's own ordering, it never edits
+     the live tree directly — checkboxes toggle the real underlying
+     task, and clicking text jumps you to the real line instead. */
+
+  function cleanProjectName(row){
+    var text = row.querySelector(".line-content").textContent;
+    return text.replace(/@[a-zA-Z_][\w-]*(?:\([^)]*\))?/g, "").replace(/:\s*$/, "").trim();
+  }
+
+  function ancestorProjectName(rows, i){
+    var indent = parseInt(rows[i].dataset.indent, 10);
+    for(var j = i - 1; j >= 0 && indent > 0; j--){
+      var r = rows[j], ri = parseInt(r.dataset.indent, 10);
+      if(ri < indent){
+        if(r.dataset.type === "project") return cleanProjectName(r);
+        indent = ri;
+      }
+    }
+    return null;
+  }
+
+  function agendaEntryText(row){
+    var text = row.querySelector(".line-content").textContent;
+    return text
+      .replace(/@do\([^)]*\)/i, "")
+      .replace(/^-\s+/, "")
+      .replace(/:\s*$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function rangesOverlap(s1, e1, s2, e2){ return s1 < e2 && s2 < e1; }
+
+  function to12Label(hhmm){
+    var parts = hhmm.split(":");
+    var h = parseInt(parts[0], 10), m = parts[1];
+    var period = h >= 12 ? "pm" : "am";
+    var h12 = h % 12; if(h12 === 0) h12 = 12;
+    return h12 + (m === "00" ? "" : ":" + m) + period;
+  }
+
+  function collectAgendaGroups(){
+    var rows = Array.prototype.slice.call(outline.children);
+    var re = new RegExp("@do\\(" + escapeRegex(todayISO()) + "\\s(\\d{2}:\\d{2})-(\\d{2}:\\d{2})\\)");
+    var groups = {}, order = [];
+    rows.forEach(function(row, i){
+      var type = row.dataset.type;
+      if(type !== "task" && type !== "project") return;
+      var text = row.querySelector(".line-content").textContent;
+      if(hideCompleted && row.classList.contains("done-task")) return;
+      var m = text.match(re);
+      if(!m) return;
+      var key = m[1] + "-" + m[2];
+      if(!groups[key]){ groups[key] = { start: m[1], end: m[2], entries: [] }; order.push(key); }
+      groups[key].entries.push({
+        row: row,
+        isProject: type === "project",
+        done: row.classList.contains("done-task"),
+        text: agendaEntryText(row),
+        breadcrumb: type === "project" ? null : ancestorProjectName(rows, i)
+      });
+    });
+    order.sort(function(a, b){ return groups[a].start.localeCompare(groups[b].start); });
+    order.forEach(function(k){
+      var g = groups[k];
+      g.conflict = order.some(function(k2){
+        if(k2 === k) return false;
+        var g2 = groups[k2];
+        return rangesOverlap(g.start, g.end, g2.start, g2.end);
+      });
+    });
+    return order.map(function(k){ return groups[k]; });
+  }
+
+  function jumpToRow(row){
+    hideAgenda();
+    var rows = Array.prototype.slice.call(outline.children);
+    var idx = rows.indexOf(row);
+    var indent = parseInt(row.dataset.indent, 10);
+    for(var j = idx - 1; j >= 0 && indent > 0; j--){
+      var r = rows[j], ri = parseInt(r.dataset.indent, 10);
+      if(ri < indent){ if(r.dataset.type === "project") r.dataset.collapsed = "false"; indent = ri; }
+    }
+    refreshVisibility();
+    var c = row.querySelector(".line-content");
+    c.scrollIntoView({ block: "center" });
+    c.focus();
+    setCaretOffset(c, c.textContent.length);
+  }
+
+  function renderAgenda(){
+    agendaView.innerHTML = "";
+    var groups = collectAgendaGroups();
+    if(!groups.length){
+      var empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "Nothing time-blocked for today.";
+      agendaView.appendChild(empty);
+      return;
+    }
+    groups.forEach(function(g){
+      var heading = document.createElement("div");
+      heading.className = "agenda-heading" + (g.conflict ? " agenda-conflict" : "");
+      heading.textContent = to12Label(g.start) + "\u2013" + to12Label(g.end);
+      agendaView.appendChild(heading);
+
+      var list = document.createElement("div");
+      list.className = "agenda-group";
+      g.entries.forEach(function(en){
+        var item = document.createElement("div");
+        item.className = "agenda-item" + (en.done ? " agenda-done" : "");
+
+        if(!en.isProject){
+          var cb = document.createElement("span");
+          cb.className = "agenda-checkbox";
+          cb.setAttribute("role", "checkbox");
+          cb.setAttribute("aria-checked", String(en.done));
+          cb.setAttribute("tabindex", "0");
+          cb.textContent = en.done ? "\u2611" : "\u2610";
+          cb.addEventListener("click", function(){ toggleDone(en.row); renderAgenda(); });
+          cb.addEventListener("keydown", function(ev){
+            if(ev.key === "Enter" || ev.key === " "){ ev.preventDefault(); cb.click(); }
+          });
+          item.appendChild(cb);
+        }
+
+        var txt = document.createElement("span");
+        txt.className = "agenda-item-text" + (en.isProject ? " agenda-item-project" : "");
+        txt.setAttribute("tabindex", "0");
+        txt.innerHTML = highlightLine(en.text) || "&nbsp;";
+        txt.addEventListener("click", function(){ jumpToRow(en.row); });
+        txt.addEventListener("keydown", function(ev){
+          if(ev.key === "Enter"){ ev.preventDefault(); jumpToRow(en.row); }
+        });
+        item.appendChild(txt);
+
+        if(en.breadcrumb){
+          var bc = document.createElement("span");
+          bc.className = "agenda-breadcrumb";
+          bc.textContent = "\u2014 " + en.breadcrumb;
+          item.appendChild(bc);
+        }
+        list.appendChild(item);
+      });
+      agendaView.appendChild(list);
+    });
+  }
+
+  function setAgendaBtnState(){
+    agendaBtn.classList.toggle("active", agendaActive);
+    agendaBtn.setAttribute("aria-pressed", String(agendaActive));
+  }
+
+  function showAgenda(){
+    agendaActive = true;
+    setAgendaBtnState();
+    outline.hidden = true;
+    emptyState.hidden = true;
+    agendaView.hidden = false;
+    renderAgenda();
+  }
+
+  function hideAgenda(){
+    if(!agendaActive) return;
+    agendaActive = false;
+    setAgendaBtnState();
+    agendaView.hidden = true;
+    outline.hidden = false;
+    refreshVisibility();
+  }
+
+  function toggleAgendaView(){
+    if(agendaActive) hideAgenda(); else showAgenda();
+  }
+
+  agendaBtn.addEventListener("click", toggleAgendaView);
+
   /* ---------------- hide completed ---------------- */
 
   function updateCompletedBtnLabel(){
@@ -1263,6 +1708,315 @@
   }
 
   completedBtn.addEventListener("click", function(){ setHideCompleted(!hideCompleted); });
+
+  /* ---------------- @ tag menu ----------------
+     Two small, single-purpose tiers, both purely optional accelerators
+     on top of the same parser that handles hand-typed text — selecting
+     anything here just inserts plain text at the cursor, it never
+     writes canonical form directly. Typing past the menu at any point
+     dismisses it. */
+
+  var TAG_DEFS = [
+    { name: "do", group: "Scheduling", desc: "When you'll work on it \u2014 date, or date + time range", hasParens: true, hasSubPicker: true },
+    { name: "due", group: "Scheduling", desc: "Deadline \u2014 when it must be done by", hasParens: true },
+    { name: "today", group: "Scheduling", desc: "Quick marker for something to do today", hasParens: false },
+    { name: "done", group: "Other", desc: "Marks a task complete (usually added automatically)", hasParens: false },
+    { name: "search", group: "Other", desc: "Saved search \u2014 click Run to filter by a query", hasParens: true }
+  ];
+
+  function getCaretRect(content){
+    var sel = window.getSelection();
+    if(sel.rangeCount){
+      var range = sel.getRangeAt(0).cloneRange();
+      range.collapse(true);
+      var rects = range.getClientRects();
+      if(rects.length) return rects[0];
+    }
+    return content.getBoundingClientRect();
+  }
+
+  function repositionAtMenu(){
+    if(!atMenuState) return;
+    var rect = getCaretRect(atMenuState.content);
+    var top = rect.bottom + 6;
+    var left = rect.left;
+    atMenu.hidden = false;
+    atMenu.style.left = "0px";
+    atMenu.style.top = "0px";
+    var menuW = atMenu.offsetWidth || 240;
+    var maxLeft = window.innerWidth - menuW - 8;
+    if(left > maxLeft) left = Math.max(8, maxLeft);
+    var menuH = atMenu.offsetHeight || 0;
+    if(top + menuH > window.innerHeight - 8) top = Math.max(8, rect.top - menuH - 6);
+    atMenu.style.left = left + "px";
+    atMenu.style.top = top + "px";
+  }
+
+  function insertAtCursor(content, text){
+    var offset = getCaretOffset(content);
+    var full = content.textContent;
+    content.textContent = full.slice(0, offset) + text + full.slice(offset);
+    setCaretOffset(content, offset + text.length);
+    rerenderContent(content);
+    scheduleSave();
+  }
+
+  function insertSkeleton(content, atPos, caretPos, skeletonText, caretOffsetInSkeleton){
+    var full = content.textContent;
+    content.textContent = full.slice(0, atPos) + skeletonText + full.slice(caretPos);
+    setCaretOffset(content, atPos + caretOffsetInSkeleton);
+    rerenderContent(content);
+    scheduleSave();
+  }
+
+  function buildTagRow(def){
+    var row = document.createElement("button");
+    row.type = "button";
+    row.className = "at-menu-row";
+    row.innerHTML = '<span class="at-menu-row-name">@' + def.name + '</span>' +
+      '<span class="at-menu-row-desc">' + escapeHtml(def.desc) + '</span>';
+    row.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+    row.addEventListener("click", function(){ selectKnownTag(def); });
+    return row;
+  }
+
+  function buildUserTagRow(t){
+    var row = document.createElement("button");
+    row.type = "button";
+    row.className = "at-menu-row";
+    row.innerHTML = '<span class="at-menu-row-name">@' + escapeHtml(t.name) + '</span>' +
+      '<span class="at-menu-row-desc">Used ' + t.count + ' time' + (t.count === 1 ? "" : "s") + '</span>';
+    row.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+    row.addEventListener("click", function(){ selectUserTag(t.name); });
+    return row;
+  }
+
+  function renderAtMenuTags(partial){
+    atMenu.innerHTML = "";
+    var pl = partial.toLowerCase();
+    var any = false;
+    ["Scheduling", "Other"].forEach(function(group){
+      var items = TAG_DEFS.filter(function(t){
+        return t.group === group && (!pl || t.name.indexOf(pl) !== -1);
+      });
+      if(!items.length) return;
+      any = true;
+      var label = document.createElement("div");
+      label.className = "at-menu-group-label";
+      label.textContent = group;
+      atMenu.appendChild(label);
+      items.forEach(function(t){ atMenu.appendChild(buildTagRow(t)); });
+    });
+
+    var known = TAG_DEFS.map(function(t){ return t.name; });
+    var userTags = collectTags().filter(function(t){ return known.indexOf(t.name) === -1; });
+    var matched = userTags.filter(function(t){ return !pl || t.name.indexOf(pl) !== -1; });
+    if(matched.length){
+      any = true;
+      var label2 = document.createElement("div");
+      label2.className = "at-menu-group-label";
+      label2.textContent = "Your tags";
+      atMenu.appendChild(label2);
+      matched.slice(0, 8).forEach(function(t){ atMenu.appendChild(buildUserTagRow(t)); });
+    }
+
+    if(!any){
+      var empty = document.createElement("div");
+      empty.className = "at-menu-empty";
+      empty.textContent = "No matching tags";
+      atMenu.appendChild(empty);
+    }
+  }
+
+  function addSkipButton(label){
+    var skip = document.createElement("button");
+    skip.type = "button";
+    skip.className = "at-chip at-chip-skip";
+    skip.textContent = label;
+    skip.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+    skip.addEventListener("click", function(){ closeAtMenu(); });
+    atMenu.appendChild(skip);
+  }
+
+  function nextWeekdayChips(){
+    var names = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    var short = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    var out = [];
+    var d = new Date().getDay();
+    for(var i = 2; i <= 7; i++){
+      var idx = (d + i) % 7;
+      out.push({ label: short[idx], val: names[idx] });
+    }
+    return out;
+  }
+
+  function renderDoDateChips(){
+    atMenu.innerHTML = "";
+    var label = document.createElement("div");
+    label.className = "at-menu-group-label";
+    label.textContent = "When";
+    atMenu.appendChild(label);
+    var wrap = document.createElement("div");
+    wrap.className = "at-menu-chips";
+    var opts = [{ label: "Today", val: "today" }, { label: "Tomorrow", val: "tomorrow" }].concat(nextWeekdayChips());
+    opts.forEach(function(o){
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "at-chip";
+      btn.textContent = o.label;
+      btn.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+      btn.addEventListener("click", function(){ chooseDoDate(o.val); });
+      wrap.appendChild(btn);
+    });
+    atMenu.appendChild(wrap);
+    addSkipButton("Type instead \u2192");
+    repositionAtMenu();
+  }
+
+  function labelToMinutes(lbl){
+    var m = lbl.match(/^(\d{1,2})(am|pm)$/i);
+    if(!m) return 0;
+    var h = parseInt(m[1], 10) % 12;
+    return (h + (m[2].toLowerCase() === "pm" ? 12 : 0)) * 60;
+  }
+
+  function minutesToChipLabel(min){
+    var h24 = Math.floor(min / 60) % 24, m = min % 60;
+    var period = h24 >= 12 ? "pm" : "am";
+    var h12 = h24 % 12; if(h12 === 0) h12 = 12;
+    return h12 + (m ? ":" + pad2(m) : "") + period;
+  }
+
+  function renderDoStartChips(){
+    atMenu.innerHTML = "";
+    var label = document.createElement("div");
+    label.className = "at-menu-group-label";
+    label.textContent = "Start time";
+    atMenu.appendChild(label);
+    var wrap = document.createElement("div");
+    wrap.className = "at-menu-chips";
+    ["8am", "9am", "10am", "11am", "12pm", "1pm", "2pm", "3pm", "4pm", "5pm"].forEach(function(lbl){
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "at-chip";
+      btn.textContent = lbl;
+      btn.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+      btn.addEventListener("click", function(){ chooseDoStart(lbl); });
+      wrap.appendChild(btn);
+    });
+    atMenu.appendChild(wrap);
+    addSkipButton("Done");
+    repositionAtMenu();
+  }
+
+  function renderDoEndChips(startLbl){
+    atMenu.innerHTML = "";
+    var label = document.createElement("div");
+    label.className = "at-menu-group-label";
+    label.textContent = "End time";
+    atMenu.appendChild(label);
+    var wrap = document.createElement("div");
+    wrap.className = "at-menu-chips";
+    var startMin = labelToMinutes(startLbl);
+    [30, 60, 90, 120].forEach(function(d){
+      var endMin = startMin + d;
+      if(endMin >= 24 * 60) return;
+      var lbl = minutesToChipLabel(endMin);
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "at-chip";
+      btn.textContent = lbl;
+      btn.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+      btn.addEventListener("click", function(){ chooseDoEnd(lbl); });
+      wrap.appendChild(btn);
+    });
+    atMenu.appendChild(wrap);
+    addSkipButton("Done");
+    repositionAtMenu();
+  }
+
+  function chooseDoDate(val){
+    insertAtCursor(atMenuState.content, val);
+    atMenuState.mode = "do-start";
+    renderDoStartChips();
+  }
+
+  function chooseDoStart(lbl){
+    insertAtCursor(atMenuState.content, " " + lbl);
+    atMenuState.mode = "do-end";
+    renderDoEndChips(lbl);
+  }
+
+  function chooseDoEnd(lbl){
+    insertAtCursor(atMenuState.content, "-" + lbl);
+    closeAtMenu();
+  }
+
+  function selectKnownTag(def){
+    var st = atMenuState;
+    if(def.hasParens){
+      insertSkeleton(st.content, st.atPos, st.caretPos, "@" + def.name + "()", ("@" + def.name + "(").length);
+    } else {
+      insertSkeleton(st.content, st.atPos, st.caretPos, "@" + def.name + " ", ("@" + def.name + " ").length);
+    }
+    if(def.hasSubPicker){
+      atMenuState.mode = "do-date";
+      renderDoDateChips();
+    } else {
+      closeAtMenu();
+    }
+  }
+
+  function selectUserTag(name){
+    var st = atMenuState;
+    insertSkeleton(st.content, st.atPos, st.caretPos, "@" + name + " ", ("@" + name + " ").length);
+    closeAtMenu();
+  }
+
+  function openAtMenu(content, atPos, caretPos, partial){
+    atMenuState = { content: content, atPos: atPos, caretPos: caretPos, mode: "tags" };
+    renderAtMenuTags(partial);
+    repositionAtMenu();
+  }
+
+  function closeAtMenu(){
+    atMenu.hidden = true;
+    atMenuState = null;
+  }
+
+  function handleAtMenuInput(content){
+    if(atMenuState && atMenuState.content === content && atMenuState.mode !== "tags"){
+      // The sub-picker was open and the user typed a real keystroke instead
+      // of clicking a chip — dismiss it and let normal typing take over.
+      closeAtMenu();
+      return;
+    }
+    var caret = getCaretOffset(content);
+    var before = content.textContent.slice(0, caret);
+    var m = before.match(/@([a-zA-Z_][\w-]*)$/);
+    if(m){
+      if(atMenuState && atMenuState.content === content && atMenuState.mode === "tags"){
+        atMenuState.atPos = caret - m[0].length;
+        atMenuState.caretPos = caret;
+        renderAtMenuTags(m[1]);
+        repositionAtMenu();
+      } else {
+        openAtMenu(content, caret - m[0].length, caret, m[1]);
+      }
+    } else if(atMenuState && atMenuState.content === content){
+      closeAtMenu();
+    }
+  }
+
+  document.addEventListener("click", function(e){
+    if(!atMenuState || atMenu.hidden) return;
+    if(atMenu.contains(e.target)) return;
+    if(atMenuState.content.contains(e.target)) return;
+    closeAtMenu();
+  });
+
+  window.addEventListener("resize", function(){ if(atMenuState) repositionAtMenu(); });
+  window.addEventListener("scroll", function(){ if(atMenuState) repositionAtMenu(); }, true);
 
   /* ---------------- outline click delegation ---------------- */
 
@@ -1329,6 +2083,7 @@
   }
 
   function clearDocument(){
+    hideAgenda();
     undoDoc = serializeDocument();
 
     // A blank sheet shouldn't be hidden behind whatever filter was active.
@@ -1397,7 +2152,7 @@
   function setTheme(dark){
     document.documentElement.classList.toggle("dark", dark);
     themeBtn.setAttribute("aria-pressed", String(dark));
-    themeBtn.textContent = dark ? "🌗" : "🌗";
+    themeBtn.textContent = dark ? "Light mode" : "Dark mode";
     try{ localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch(err){ /* ignore */ }
   }
 
